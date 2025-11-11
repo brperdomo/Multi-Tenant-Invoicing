@@ -15,6 +15,7 @@ interface Invoice {
   period_end: string;
   notes?: string;
   file_path?: string;
+  generated_pdf_path?: string;
   created_at: string;
 }
 
@@ -107,7 +108,11 @@ export default function FacilityInvoicesPage() {
   };
 
   const handleViewInvoice = (filePath: string) => {
-    window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/${filePath}`, '_blank');
+    window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/${filePath}`, '_blank');
+  };
+
+  const handleViewAttachment = (filePath: string) => {
+    window.open(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/${filePath}`, '_blank');
   };
 
   if (loading) {
@@ -184,23 +189,33 @@ export default function FacilityInvoicesPage() {
                           {invoice.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
-                        {invoice.file_path && (
-                          <button
-                            onClick={() => handleViewInvoice(invoice.file_path!)}
-                            className="text-primary-600 hover:text-primary-900"
-                          >
-                            View
-                          </button>
-                        )}
-                        {invoice.status === 'pending' && (
-                          <button
-                            onClick={() => handleUploadPayment(invoice)}
-                            className="text-green-600 hover:text-green-900 font-medium"
-                          >
-                            Upload Payment
-                          </button>
-                        )}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex flex-col space-y-1">
+                          {invoice.generated_pdf_path && (
+                            <button
+                              onClick={() => handleViewInvoice(invoice.generated_pdf_path!)}
+                              className="text-primary-600 hover:text-primary-900 font-medium text-left"
+                            >
+                              View Invoice
+                            </button>
+                          )}
+                          {invoice.file_path && (
+                            <button
+                              onClick={() => handleViewAttachment(invoice.file_path!)}
+                              className="text-blue-600 hover:text-blue-900 text-left"
+                            >
+                              View Attachment
+                            </button>
+                          )}
+                          {invoice.status === 'pending' && (
+                            <button
+                              onClick={() => handleUploadPayment(invoice)}
+                              className="text-green-600 hover:text-green-900 font-medium text-left"
+                            >
+                              Upload Payment
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

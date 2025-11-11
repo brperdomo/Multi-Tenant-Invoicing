@@ -2,6 +2,8 @@ import { Response } from 'express';
 import pool from '../config/database';
 import { AuthRequest, InvoiceStatus, BillingPeriod } from '../types';
 import fs from 'fs';
+import path from 'path';
+import { generateInvoicePDF } from '../utils/pdfGenerator';
 
 export const createInvoice = async (
   req: AuthRequest,
@@ -40,23 +42,49 @@ export const createInvoice = async (
       return;
     }
 
-    // Check if facility belongs to this organization
-    const facility = await pool.query(
-      'SELECT id FROM facilities WHERE id = $1 AND organization_id = $2',
+    // Get facility details for PDF generation
+    const facilityResult = await pool.query(
+      'SELECT id, name, address FROM facilities WHERE id = $1 AND organization_id = $2',
       [facility_id, req.user.userId]
     );
 
-    if (facility.rows.length === 0) {
+    if (facilityResult.rows.length === 0) {
       res.status(404).json({ error: 'Facility not found' });
       return;
     }
 
-    const filePath = req.file ? req.file.path : null;
+    const facility = facilityResult.rows[0];
+    const attachmentPath = req.file ? req.file.path : null;
+
+    // Generate PDF invoice
+    const pdfDir = './uploads/invoices/generated';
+    if (!fs.existsSync(pdfDir)) {
+      fs.mkdirSync(pdfDir, { recursive: true });
+    }
+
+    const pdfFileName = `invoice-${invoice_number.replace(/[^a-zA-Z0-9]/g, '-')}-${Date.now()}.pdf`;
+    const pdfPath = path.join(pdfDir, pdfFileName);
+
+    await generateInvoicePDF(
+      {
+        invoice_number,
+        facility_name: facility.name,
+        facility_address: facility.address,
+        amount,
+        due_date,
+        billing_period,
+        period_start,
+        period_end,
+        notes,
+        created_at: new Date().toISOString(),
+      },
+      pdfPath
+    );
 
     const result = await pool.query(
       `INSERT INTO invoices
-       (organization_id, facility_id, invoice_number, amount, due_date, billing_period, period_start, period_end, file_path, notes, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       (organization_id, facility_id, invoice_number, amount, due_date, billing_period, period_start, period_end, file_path, generated_pdf_path, notes, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         req.user.userId,
@@ -67,7 +95,8 @@ export const createInvoice = async (
         billing_period,
         period_start,
         period_end,
-        filePath,
+        attachmentPath,
+        pdfPath,
         notes,
         'pending',
       ]
